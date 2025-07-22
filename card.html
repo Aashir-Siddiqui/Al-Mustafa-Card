@@ -3,14 +3,81 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Download Card</title>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <h1>Download Your Card</h1>
     <div class="form-group">
-      <label for="cardCNIC">CNIC:</label>
+      <label for="cardCNIC">Enter CNIC:</label>
       <input type="number" id="cardCNIC" name="cardCNIC" required />
+      <button id="fetchCard">Show Card</button>
     </div>
-    <div class="container"></div>
-    <button id="downloadCard">Dowmload Card</button>
+    <div class="container" id="cardContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script type="module">
+      import { collection, getDocs, db } from "./firebase.js";
+
+      const showError = (title, text) => Swal.fire({ icon: "error", title, text });
+      const showSuccess = (title, text) => Swal.fire({ icon: "success", title, text });
+
+      document.getElementById("fetchCard").addEventListener("click", async () => {
+        const cardCNIC = document.getElementById("cardCNIC").value.trim();
+        const cardContainer = document.getElementById("cardContainer");
+
+        if (!cardCNIC) {
+          showError("Error", "Please enter a CNIC number.");
+          return;
+        }
+
+        try {
+          const querySnapshot = await getDocs(collection(db, "data"));
+          let cardFound = false;
+
+          cardContainer.innerHTML = "";
+
+          querySnapshot.forEach((doc) => {
+            const card = doc.data();
+            if (card.CNIC === cardCNIC) {
+              cardFound = true;
+              const cardElement = document.createElement("div");
+              cardElement.classList.add("card");
+              cardElement.id = "cardElement";
+              cardElement.innerHTML = `
+                <img src="${card.image || 'https://via.placeholder.com/150'}" alt="Card Image" class="card-image">
+                <h2>${card.name}</h2>
+                <p><strong>Course:</strong> ${card.course}</p>
+                <p><strong>Proficiency:</strong> ${card.proficiency}</p>
+                <p><strong>CNIC:</strong> ${card.CNIC}</p>
+                <button class="download-btn">Download Card</button>
+              `;
+              cardContainer.appendChild(cardElement);
+
+              cardElement.querySelector(".download-btn").addEventListener("click", async () => {
+                const card = document.getElementById("cardElement");
+                try {
+                  const canvas = await html2canvas(card);
+                  const link = document.createElement("a");
+                  link.href = canvas.toDataURL("image/png");
+                  link.download = `card_${cardCNIC}.png`;
+                  link.click();
+                  showSuccess("Success", "Card downloaded successfully!");
+                } catch (e) {
+                  showError("Error", "Failed to download card: " + e.message);
+                }
+              });
+            }
+          });
+
+          if (!cardFound) {
+            showError("Error", "No card found for this CNIC.");
+          }
+        } catch (e) {
+          showError("Error", "Failed to fetch card: " + e.message);
+        }
+      });
+    </script>
   </body>
 </html>
